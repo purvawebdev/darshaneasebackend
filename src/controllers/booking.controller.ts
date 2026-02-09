@@ -1,10 +1,15 @@
 import { Request, Response } from 'express';
 import { bookingService } from '../services/booking.service';
 
-export const createBooking = async (req: Request, res: Response) => {
+interface AuthRequest extends Request {
+    user?: {
+        id: string;
+    };
+}
+
+export const createBooking = async (req: AuthRequest, res: Response) => {
     try {
-        // We'll add req.user later (from JWT middleware)
-        const userId = (req as any).user?.id; // temporary — will be protected later
+        const userId = req.user?.id;
 
         if (!userId) {
             return res.status(401).json({ message: 'Not authenticated' });
@@ -20,7 +25,8 @@ export const createBooking = async (req: Request, res: Response) => {
 
         return res.status(201).json({
             success: true,
-            data: booking,
+            message: 'Booking created successfully',
+            bookingId: booking._id,
         });
     } catch (error: any) {
         return res.status(400).json({ message: error.message });

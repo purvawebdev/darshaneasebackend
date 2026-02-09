@@ -13,15 +13,13 @@ const bookingSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'confirmed', 'cancelled'],
+        enum: ['confirmed', 'cancelled'], //add pending later when the admin logic is done and slot availability is done
         default: 'confirmed',
     },
     bookedAt: {
         type: Date,
         default: Date.now,
     },
-}, {
-    timestamps: true,
-});
+}, { timestamps: true });
 
 export const Booking = mongoose.model('Booking', bookingSchema);
