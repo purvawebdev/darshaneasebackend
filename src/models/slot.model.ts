@@ -7,7 +7,7 @@ const slotSchema = new mongoose.Schema({
     maxCapacity: { type: Number, required: true },
     currentBooked: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
-    // templeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Temple' }, // add later
+    templeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Temple', required: true },
 }, {
     timestamps: true,
 });

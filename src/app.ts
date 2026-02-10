@@ -3,6 +3,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.routes";
 import slotRoutes from "./routes/slot.routes";
 import bookingRoutes from "./routes/booking.routes";
+import templeRoutes from "./routes/temple.routes";
 
 const app = express();
 
@@ -10,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/temples", templeRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
