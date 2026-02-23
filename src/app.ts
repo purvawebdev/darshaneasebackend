@@ -10,7 +10,17 @@ import templeAdminRoutes from "./routes/templeAdmin.routes";
 
 const app = express();
 
-app.use(cors());
+// CORS — allow frontend origin in production, all origins in dev
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+  : ["*"];
+
+app.use(
+  cors({
+    origin: allowedOrigins.includes("*") ? true : allowedOrigins,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // ----- Public / Devotee routes -----
