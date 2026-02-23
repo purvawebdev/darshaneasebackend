@@ -5,6 +5,10 @@
     "scripts": {
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
         "seed": "ts-node src/scripts/seed-slot.ts",
+        "seed:temples": "ts-node src/scripts/seedTemples.ts",
+        "seed:slots": "ts-node src/scripts/seedSlots.ts",
+        "seed:superadmin": "ts-node src/scripts/seedSuperAdmin.ts",
+        "seed:all": "ts-node src/scripts/seedTemples.ts && ts-node src/scripts/seedSlots.ts && ts-node src/scripts/seedSuperAdmin.ts",
         "build": "tsc",
         "start": "node dist/server.js"
     },

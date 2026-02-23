@@ -19,8 +19,14 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ["devotee", "admin"],
+            enum: ["devotee", "templeAdmin", "superadmin"],
             default: "devotee",
+        },
+        // For templeAdmin: which temple they manage
+        assignedTemple: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Temple",
+            default: null,
         },
     },
     {

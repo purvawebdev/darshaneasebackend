@@ -53,10 +53,10 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
         const bookings = await Booking.find({ user: userId, status: 'confirmed' })
             .populate<{ slot: PopulatedSlot }>({
                 path: 'slot',
-                select: 'date startTime endTime maxCapacity currentBooked templeId',
+                select: 'date startTime endTime label maxCapacity currentBooked templeId',
                 populate: {
                     path: 'templeId',
-                    select: 'name location deity image',
+                    select: 'name location deity image imageUrl',
                 },
             })
             .sort({ bookedAt: -1 })
@@ -67,6 +67,7 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
             slot: {
                 date: b.slot.date,
                 time: `${(b.slot as any).startTime} - ${(b.slot as any).endTime}`,
+                label: (b.slot as any).label,
                 capacity: `${(b.slot as any).currentBooked}/${(b.slot as any).maxCapacity}`,
                 temple: (b.slot as any).templeId,
             },

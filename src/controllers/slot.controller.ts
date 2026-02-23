@@ -18,7 +18,7 @@ export const getSlots = async (req: Request, res: Response) => {
 
         // For now — no pagination, no sorting, keep it minimal
         const slots = await Slot.find(filter)
-            .populate('templeId', 'name location deity image')
+            .populate('templeId', 'name location deity image imageUrl')
             .sort({ date: 1, startTime: 1 }) // chronological order
             .lean(); // faster, plain JS objects
 

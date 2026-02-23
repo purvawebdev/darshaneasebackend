@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
 const slotSchema = new mongoose.Schema({
-    date: { type: String, required: true, index: true }, // "YYYY-MM-DD"
-    startTime: { type: String, required: true }, // "06:00"
-    endTime: { type: String, required: true },   // "07:00"
+    date: { type: String, required: true, index: true },       // "YYYY-MM-DD"
+    startTime: { type: String, required: true },               // "06:00"
+    endTime: { type: String, required: true },                 // "06:15"
+    label: { type: String, required: true },                   // "A", "B", "C" ...
     maxCapacity: { type: Number, required: true },
     currentBooked: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
