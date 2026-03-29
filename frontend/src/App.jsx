@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import Slots from './pages/Slots';
 import Bookings from './pages/Bookings';
+import AdminSlots from './pages/AdminSlots';
 import './index.css';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/slots/:templeId" element={<Slots />} />
             <Route path="/bookings" element={<Bookings />} />
+            <Route path="/admin/slots" element={<AdminSlots />} />
           </Route>
 
           {/* 404 - Redirect to home */}

@@ -1,0 +1,267 @@
+# DarshanEase Backend — Architecture & Future Scope
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Language** | TypeScript (ES2022, strict mode) |
+| **Runtime** | Node.js |
+| **Framework** | Express 4 |
+| **Database** | MongoDB Atlas via Mongoose 8 |
+| **Auth** | JWT (`jsonwebtoken`) + `bcryptjs` |
+| **Validation** | Zod (env config), manual checks in controllers |
+| **Media** | Cloudinary (dependency present, not yet deeply integrated) |
+| **Dev tools** | `ts-node-dev` (hot-reload), `tsc` for production builds |
+
+---
+
+## Project Structure
+
+```
+src/
+├── server.ts            ← Entry point: connects to MongoDB, starts Express
+├── app.ts               ← Express app: registers CORS, JSON parsing, all routes
+├── config/
+│   └── env.ts           ← Zod-validated environment config (PORT, MONGODB_URI, JWT_SECRET)
+├── models/              ← Mongoose schemas (4 collections)
+│   ├── user.model.ts
+│   ├── temple.model.ts
+│   ├── slot.model.ts
+│   └── booking.model.ts
+├── middlewares/
+│   └── auth.middleware.ts  ← JWT `protect` guard + `requireRole(...)` RBAC guard
+├── services/            ← Business logic layer
+│   ├── auth.service.ts     ← Register / Login (bcrypt + JWT)
+│   └── booking.service.ts  ← Slot validation + atomic booking creation
+├── controllers/         ← Request handlers (7 files)
+│   ├── auth.controller.ts
+│   ├── temple.controller.ts
+│   ├── slot.controller.ts
+│   ├── booking.controller.ts
+│   ├── payment.controller.ts
+│   ├── admin.controller.ts
+│   └── templeAdmin.controller.ts
+├── routes/              ← Express routers (7 files, maps 1:1 to controllers)
+│   ├── auth.routes.ts
+│   ├── temple.routes.ts
+│   ├── slot.routes.ts
+│   ├── booking.routes.ts
+│   ├── payment.routes.ts
+│   ├── admin.routes.ts
+│   └── templeAdmin.routes.ts
+└── scripts/             ← CLI seed & maintenance utilities
+    ├── seedTemples.ts      ← Seed 6 famous Indian temples
+    ├── seedSlots.ts        ← Generate 15-min time slots for each temple
+    ├── seedSuperAdmin.ts   ← Create default superadmin user
+    ├── seed-slot.ts        ← Legacy single-temple slot seeder
+    └── cleanupOldData.ts   ← Wipe old bookings (migration helper)
+```
+
+---
+
+## Data Model
+
+```mermaid
+erDiagram
+    USER {
+        ObjectId _id
+        String phone UK
+        String name
+        String passwordHash
+        String role "devotee | templeAdmin | superadmin"
+        ObjectId assignedTemple FK "nullable"
+    }
+    TEMPLE {
+        ObjectId _id
+        String name
+        String description
+        String location
+        String deity
+        String image "emoji"
+        String imageUrl
+        String timings
+        Array operatingHours "open/close HH:mm pairs"
+        Boolean isActive
+    }
+    SLOT {
+        ObjectId _id
+        String date "YYYY-MM-DD"
+        String startTime "HH:mm"
+        String endTime "HH:mm"
+        String label "A, B, C..."
+        Number maxCapacity
+        Number currentBooked
+        Boolean isActive
+        ObjectId templeId FK
+    }
+    BOOKING {
+        ObjectId _id
+        ObjectId user FK
+        ObjectId slot FK
+        String status "confirmed | cancelled"
+        Date bookedAt
+    }
+
+    TEMPLE ||--o{ SLOT : "has many"
+    SLOT ||--o{ BOOKING : "has many"
+    USER ||--o{ BOOKING : "makes"
+    USER }o--|| TEMPLE : "manages (if templeAdmin)"
+```
+
+> **Key relationships:** A Temple has many 15-min Slots. A User books a Slot to create a Booking. A templeAdmin user is assigned exactly one Temple.
+
+---
+
+## Authentication & Authorization (RBAC)
+
+### Three Roles
+
+| Role | Scope |
+|---|---|
+| **`devotee`** | Browse temples, view slots, create bookings, see own bookings |
+| **`templeAdmin`** | All devotee abilities + manage their assigned temple's slots, view temple bookings, temple dashboard stats |
+| **`superadmin`** | Full system access — CRUD all users/temples/slots, view all bookings, global stats, assign roles |
+
+### Auth Flow
+
+1. **Register** → `POST /api/auth/register` — creates user with `devotee` role, returns JWT (7-day expiry)
+2. **Login** → `POST /api/auth/login` — verifies phone + password, returns JWT
+3. **Protected routes** use the [protect](file:///f:/project/darshaneasebackend/src/middlewares/auth.middleware.ts#9-27) middleware (extracts JWT from `Authorization: Bearer <token>`)
+4. **Role-gated routes** stack [requireRole('superadmin')](file:///f:/project/darshaneasebackend/src/middlewares/auth.middleware.ts#28-46) or [requireRole('templeAdmin')](file:///f:/project/darshaneasebackend/src/middlewares/auth.middleware.ts#28-46) on top of [protect](file:///f:/project/darshaneasebackend/src/middlewares/auth.middleware.ts#9-27)
+
+---
+
+## API Surface
+
+### Public (No Auth)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/temples` | List all active temples |
+| `GET` | `/api/temples/:id` | Get temple details |
+| `GET` | `/health` | Health check |
+
+### Devotee (Auth Required)
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register new devotee |
+| `POST` | `/api/auth/login` | Login |
+| `GET` | `/api/slots?date=&templeId=` | Browse available slots |
+| `POST` | `/api/bookings` | Create booking directly |
+| `GET` | `/api/bookings` | My confirmed bookings |
+| `POST` | `/api/payments/simulate` | Simulated payment → booking |
+
+### Temple Admin (`templeAdmin` role)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/temple-admin/stats` | Temple dashboard stats |
+| `GET` | `/api/temple-admin/temple` | Get own temple info |
+| `PUT` | `/api/temple-admin/temple` | Update own temple |
+| `GET` | `/api/temple-admin/slots` | List temple's slots |
+| `POST` | `/api/temple-admin/slots` | Create new slot |
+| `PUT` | `/api/temple-admin/slots/:id` | Update a slot |
+| `DELETE` | `/api/temple-admin/slots/:id` | Delete a slot |
+| `GET` | `/api/temple-admin/bookings` | View temple bookings |
+
+### Super Admin (`superadmin` role)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/admin/stats` | Global dashboard stats |
+| `GET` | `/api/admin/users` | List all users |
+| `GET` | `/api/admin/users/:id` | User detail |
+| `PATCH` | `/api/admin/users/:id/role` | Change user role |
+| `DELETE` | `/api/admin/users/:id` | Delete user |
+| `POST` | `/api/admin/temples` | Create temple |
+| `PUT` | `/api/admin/temples/:id` | Update temple |
+| `DELETE` | `/api/admin/temples/:id` | Delete temple + cascade slots |
+| `PATCH` | `/api/admin/temples/:id/toggle` | Activate / deactivate |
+| `GET` | `/api/admin/bookings` | All bookings (filterable) |
+
+---
+
+## Key Design Patterns
+
+1. **Service Layer Separation** — Business logic (`auth.service`, `booking.service`) is decoupled from HTTP handling in controllers. This makes logic reusable (e.g., `bookingService.createBooking` is used by both the direct booking route *and* the payment simulation route).
+
+2. **Atomic Booking Counter** — [booking.service.ts](file:///f:/project/darshaneasebackend/src/services/booking.service.ts) uses Mongoose `$inc` to atomically increment `currentBooked` on the slot, preventing double-booking under concurrent requests.
+
+3. **Zod Env Validation** — The server fails-fast at startup if required environment variables (`MONGODB_URI`, `JWT_SECRET`) are missing or invalid.
+
+4. **Populate Chains** — Booking queries use deep population (`booking → slot → temple`) to deliver denormalized responses.
+
+5. **Ownership Scoping** — Temple admins can only access resources belonging to their `assignedTemple`, enforced via the [getAssignedTemple()](file:///f:/project/darshaneasebackend/src/controllers/templeAdmin.controller.ts#10-26) helper in every templeAdmin controller method.
+
+---
+
+## What's Working Well ✅
+
+- Clean layered architecture (routes → controllers → services → models)
+- RBAC with middleware composition is simple and effective
+- Multi-temple support with per-temple slot management
+- Atomic booking counter prevents overbooking
+- Seed scripts make development and demo setup fast
+- Zod validates critical env vars at startup
+
+---
+
+## Current Limitations & Gaps ⚠️
+
+| Area | Issue |
+|---|---|
+| **Payment** | Simulated only (2s delay + fake ID). No real gateway. |
+| **No Booking Cancellation API** | Status field exists (`confirmed`, `cancelled`) but no cancel endpoint |
+| **No Pagination** | All list endpoints return full result sets—will become slow at scale |
+| **No Rate Limiting** | Open to brute-force login and spam requests |
+| **No Input Validation** | Controllers do manual `!field` checks; no Zod on request bodies |
+| **No Email/SMS** | No notifications for booking confirmations |
+| **No Queue System** | No live queue/crowd estimation |
+| **No Tests** | Zero unit or integration tests |
+| **Hard Deletion** | Users and temples are hard-deleted, not soft-deleted |
+| **No Logging** | No structured logging (e.g., Winston, Pino) |
+| **No Error Handling Middleware** | Each controller catches its own errors; no global handler |
+
+---
+
+## 🚀 Future Scope
+
+### Phase 1 — Production Hardening
+
+| Feature | Details |
+|---|---|
+| **Real Payment Gateway** | Integrate Razorpay or PhonePe. Add [Payment](file:///f:/project/darshaneasebackend/src/controllers/payment.controller.ts#13-56) model to track transactions. Use webhook callbacks for confirmation. |
+| **Booking Cancellation & Refund** | `PATCH /api/bookings/:id/cancel` with `$inc: { currentBooked: -1 }` on the slot and optional refund trigger. |
+| **Request Validation** | Use Zod schemas as Express middleware on every route to validate and sanitize request bodies/params/queries. |
+| **Global Error Handler** | Central [(err, req, res, next)](file:///f:/project/darshaneasebackend/src/services/auth.service.ts#44-66) middleware with structured error codes and stack traces in development. |
+| **Rate Limiting** | `express-rate-limit` on auth endpoints (5 req/min) and public APIs. |
+| **Structured Logging** | Pino or Winston with request correlation IDs. |
+| **Pagination & Filtering** | Implement cursor-based or offset pagination on all list endpoints. |
+| **Automated Testing** | Unit tests for services, integration tests for routes (Jest + Supertest). |
+
+### Phase 2 — Feature Expansion
+
+| Feature | Details |
+|---|---|
+| **Live Queue / Crowd Status** | Real-time crowd estimation using WebSockets (`socket.io`). Display current wait time and crowd density per slot. |
+| **QR Code Check-in** | Generate QR codes on booking confirmation. Temple admin scans to mark attendance. |
+| **Push Notifications** | Firebase Cloud Messaging for booking reminders, slot availability alerts. |
+| **Email / SMS Confirmations** | Integrate Nodemailer + Twilio for booking receipts and OTP-based auth. |
+| **OTP-Based Login** | Replace password auth with phone OTP for devotees; keep password for admins. |
+| **Donation Module** | Online donations per-temple with receipt generation. |
+| **Special Darshan (VIP)** | Premium slot tiers with different pricing and faster entry. |
+| **Multi-Language Support** | `i18n` middleware for Hindi, Tamil, Telugu, etc. |
+
+### Phase 3 — Scale & Intelligence
+
+| Feature | Details |
+|---|---|
+| **Caching** | Redis for frequently accessed temple lists, slot availability. |
+| **CDN for Images** | Cloudinary integration (already in [package.json](file:///f:/project/darshaneasebackend/package.json)) for temple images with transformations. |
+| **Analytics Dashboard** | Aggregate booking trends, peak hours, popular temples using MongoDB aggregation pipelines. |
+| **ML-Based Crowd Prediction** | Use historical booking data to predict peak times and recommend less busy slots. |
+| **Microservices Split** | Extract booking, payment, and notifications into separate services as traffic grows. |
+| **API Versioning** | Version routes (`/api/v1/`, `/api/v2/`) for backward compatibility. |
+| **CI/CD Pipeline** | GitHub Actions for lint, test, build, and deploy to AWS/Vercel. |
+| **Container & Orchestration** | Docker + Kubernetes for horizontal scaling and zero-downtime deployments. |
+
+---
+
+> **Summary:** The DarshanEase backend is a well-structured, TypeScript + Express + MongoDB REST API with a 3-tier RBAC system supporting devotees, temple admins, and a superadmin. It handles multi-temple darshan slot booking with atomic capacity management. The current system is a solid MVP — the biggest next steps are integrating a real payment gateway, adding automated tests, improving input validation, and building out the live queue status feature.
