@@ -10,23 +10,13 @@ import templeAdminRoutes from "./routes/templeAdmin.routes";
 
 const app = express();
 
-// CORS must be first, before routes
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
-  : "*";
-
-const corsOptions = {
-  origin: allowedOrigins === "*" ? "*" : allowedOrigins,
-  credentials: true,
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200,
-};
+}));
 
-app.use(cors(corsOptions));
-
-// Handle preflight explicitly
-app.options("*", cors(corsOptions));
+app.options("*", cors());
 
 app.use(express.json());
 
