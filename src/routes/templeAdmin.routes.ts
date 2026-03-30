@@ -7,6 +7,7 @@ import {
     createSlot,
     updateSlot,
     deleteSlot,
+    createBulkSlots,
     getTempleBookings,
     getTempleStats,
 } from '../controllers/templeAdmin.controller';
@@ -25,6 +26,7 @@ router.put('/temple', updateMyTemple);
 
 // ----- Slot Management -----
 router.get('/slots', getTempleSlots);
+router.post('/slots/bulk', createBulkSlots);
 router.post('/slots', createSlot);
 router.put('/slots/:id', updateSlot);
 router.delete('/slots/:id', deleteSlot);
