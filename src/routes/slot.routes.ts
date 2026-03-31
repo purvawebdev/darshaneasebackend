@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { getSlots } from '../controllers/slot.controller';
-import { protect } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.get('/', protect, getSlots);
+router.get('/', getSlots);  // Public — users browse slots before login
 
 export default router;
