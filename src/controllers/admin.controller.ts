@@ -180,11 +180,12 @@ export const toggleTempleStatus = async (req: AuthRequest, res: Response) => {
 /** GET /api/admin/stats — Global dashboard stats */
 export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     try {
-        const [totalUsers, totalTemples, totalBookings, totalSlots] = await Promise.all([
+        const [totalUsers, totalTemples, totalBookings, totalSlots, totalVisited] = await Promise.all([
             User.countDocuments(),
             Temple.countDocuments({ isActive: true }),
             Booking.countDocuments({ status: 'confirmed' }),
             Slot.countDocuments({ isActive: true }),
+            Booking.countDocuments({ status: 'confirmed', scannedAt: { $ne: null } }),
         ]);
 
         res.json({
@@ -194,6 +195,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
                 totalTemples,
                 totalBookings,
                 totalSlots,
+                totalVisited,
             },
         });
     } catch (error: any) {

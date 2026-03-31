@@ -84,3 +84,95 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
     }
 };
 
+/**
+ * GET /api/bookings/:id/verify
+ * Public endpoint — returns booking details for QR scan verification.
+ * No auth required so it works when temple staff scan the QR.
+ */
+export const verifyBooking = async (req: Request, res: Response) => {
+    try {
+        const booking = await Booking.findById(req.params.id)
+            .populate({
+                path: 'user',
+                select: 'name phone',
+            })
+            .populate({
+                path: 'slot',
+                select: 'date startTime endTime label maxCapacity currentBooked templeId',
+                populate: {
+                    path: 'templeId',
+                    select: 'name location deity image imageUrl',
+                },
+            })
+            .lean();
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                bookingId: booking._id,
+                status: booking.status,
+                scannedAt: booking.scannedAt || null,
+                user: booking.user,
+                slot: booking.slot,
+                bookedAt: booking.bookedAt,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+/**
+ * POST /api/bookings/:id/scan
+ * Marks a booking as scanned (visited). Called by temple admin when scanning QR.
+ * Requires auth (templeAdmin or superadmin).
+ */
+export const scanBooking = async (req: AuthRequest, res: Response) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+
+        if (booking.status !== 'confirmed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking is not in confirmed status',
+            });
+        }
+
+        if (booking.scannedAt) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking already scanned',
+                scannedAt: booking.scannedAt,
+            });
+        }
+
+        booking.scannedAt = new Date();
+        await booking.save();
+
+        // Return the full booking data for display
+        const populated = await Booking.findById(booking._id)
+            .populate({ path: 'user', select: 'name phone' })
+            .populate({
+                path: 'slot',
+                select: 'date startTime endTime label templeId',
+                populate: { path: 'templeId', select: 'name location' },
+            })
+            .lean();
+
+        res.json({
+            success: true,
+            message: 'Booking scanned — visit confirmed',
+            data: populated,
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};

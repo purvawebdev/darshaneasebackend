@@ -215,19 +215,16 @@ export const getTempleStats = async (req: AuthRequest, res: Response) => {
 
         const today = new Date().toISOString().split('T')[0];
 
-        const [totalSlots, todaySlots, totalBookings, todayBookings] = await Promise.all([
+        const allSlotIds = await Slot.find({ templeId }).select('_id').lean().then(s => s.map(x => x._id));
+        const todaySlotIds = await Slot.find({ templeId, date: today }).select('_id').lean().then(s => s.map(x => x._id));
+
+        const [totalSlots, todaySlots, totalBookings, todayBookings, totalVisited, todayVisited] = await Promise.all([
             Slot.countDocuments({ templeId, isActive: true }),
             Slot.countDocuments({ templeId, isActive: true, date: today }),
-            Booking.countDocuments({
-                slot: { $in: await Slot.find({ templeId }).select('_id').lean().then(s => s.map(x => x._id)) },
-                status: 'confirmed',
-            }),
-            Booking.countDocuments({
-                slot: {
-                    $in: await Slot.find({ templeId, date: today }).select('_id').lean().then(s => s.map(x => x._id)),
-                },
-                status: 'confirmed',
-            }),
+            Booking.countDocuments({ slot: { $in: allSlotIds }, status: 'confirmed' }),
+            Booking.countDocuments({ slot: { $in: todaySlotIds }, status: 'confirmed' }),
+            Booking.countDocuments({ slot: { $in: allSlotIds }, status: 'confirmed', scannedAt: { $ne: null } }),
+            Booking.countDocuments({ slot: { $in: todaySlotIds }, status: 'confirmed', scannedAt: { $ne: null } }),
         ]);
 
         res.json({
@@ -237,6 +234,8 @@ export const getTempleStats = async (req: AuthRequest, res: Response) => {
                 todaySlots,
                 totalBookings,
                 todayBookings,
+                totalVisited,
+                todayVisited,
             },
         });
     } catch (error: any) {

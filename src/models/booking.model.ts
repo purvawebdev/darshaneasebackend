@@ -20,6 +20,10 @@ const bookingSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    scannedAt: {
+        type: Date,
+        default: null,
+    },
 }, { timestamps: true });
 
 export const Booking = mongoose.model('Booking', bookingSchema);

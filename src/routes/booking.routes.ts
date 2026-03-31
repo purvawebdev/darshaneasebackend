@@ -1,11 +1,14 @@
 import { Router } from 'express';
-import { createBooking } from '../controllers/booking.controller';
-import { protect } from '../middlewares/auth.middleware';
-import { getMyBookings } from '../controllers/booking.controller';
+import { createBooking, getMyBookings, verifyBooking, scanBooking } from '../controllers/booking.controller';
+import { protect, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 router.post('/', protect, createBooking);
 router.get('/', protect, getMyBookings);
+
+// QR scan endpoints
+router.get('/:id/verify', verifyBooking);  // Public — used when scanning QR
+router.post('/:id/scan', protect, requireRole('templeAdmin', 'superadmin'), scanBooking);
 
 export default router;
