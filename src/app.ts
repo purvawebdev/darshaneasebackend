@@ -7,6 +7,7 @@ import templeRoutes from "./routes/temple.routes";
 import paymentRoutes from "./routes/payment.routes";
 import adminRoutes from "./routes/admin.routes";
 import templeAdminRoutes from "./routes/templeAdmin.routes";
+import festivalRoutes from "./routes/festival.routes";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use("/api/temples", templeRoutes);
 app.use("/api/slots", slotRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/festivals", festivalRoutes);
 
 // ----- Admin routes -----
 app.use("/api/admin", adminRoutes);
