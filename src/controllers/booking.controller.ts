@@ -72,6 +72,7 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
                 temple: (b.slot as any).templeId,
             },
             bookedAt: b.bookedAt,
+            totalAmount: (b as any).bookingDetails?.totalAmount || 0,
         }));
 
         res.json({
