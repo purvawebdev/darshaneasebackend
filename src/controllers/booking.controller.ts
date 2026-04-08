@@ -27,13 +27,17 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
             return res.status(401).json({ message: 'Not authenticated' });
         }
 
-        const { slotId } = req.body;
+        const { slotId, templeId, name, age, hasDisability, isPregnant, adults, children, totalAmount } = req.body;
+        
+        const bookingDetails = {
+            name, age, hasDisability, isPregnant, adults, children, totalAmount
+        };
 
         if (!slotId) {
             return res.status(400).json({ message: 'slotId is required' });
         }
 
-        const booking = await bookingService.createBooking(userId, slotId);
+        const booking = await bookingService.createBooking(userId, slotId, templeId, bookingDetails);
 
         return res.status(201).json({
             success: true,
@@ -50,6 +54,7 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ message: 'Not authenticated' });
 
+        // Fetch confirmed bookings
         const bookings = await Booking.find({ user: userId, status: 'confirmed' })
             .populate<{ slot: PopulatedSlot }>({
                 path: 'slot',
@@ -62,26 +67,67 @@ export const getMyBookings = async (req: AuthRequest, res: Response) => {
             .sort({ bookedAt: -1 })
             .lean();
 
-        const formatted = bookings.map(b => ({
+        // Fetch waitlist entries (only waiting - confirmed ones become bookings)
+        const { Waitlist } = await import('../models/waitlist.model');
+        const waitlists = await Waitlist.find({ 
+            user: userId, 
+            status: 'waiting' 
+        })
+            .populate({
+                path: 'slot',
+                select: 'date startTime endTime label maxCapacity currentBooked templeId',
+                populate: {
+                    path: 'templeId',
+                    select: 'name location deity image imageUrl',
+                },
+            })
+            .sort({ joinedAt: -1 })
+            .lean();
+
+        // Format bookings
+        const formattedBookings = bookings.map(b => ({
             bookingId: b._id,
+            type: 'booking',
+            status: 'confirmed',
             slot: {
-                date: b.slot.date,
-                time: `${(b.slot as any).startTime} - ${(b.slot as any).endTime}`,
-                label: (b.slot as any).label,
-                capacity: `${(b.slot as any).currentBooked}/${(b.slot as any).maxCapacity}`,
-                temple: (b.slot as any).templeId,
+                date: (b.slot as any)?.date || 'N/A',
+                time: `${(b.slot as any)?.startTime || '--:--'} - ${(b.slot as any)?.endTime || '--:--'}`,
+                label: (b.slot as any)?.label || '',
+                capacity: `${(b.slot as any)?.currentBooked || 0}/${(b.slot as any)?.maxCapacity || 0}`,
+                temple: (b.slot as any)?.templeId || {},
             },
             bookedAt: b.bookedAt,
             totalAmount: (b as any).bookingDetails?.totalAmount || 0,
         }));
 
+        // Format waitlist entries
+        const formattedWaitlists = waitlists.map(w => ({
+            bookingId: w._id,
+            type: 'waitlist',
+            status: w.status, // 'waiting' or 'confirmed'
+            position: w.position,
+            slot: {
+                date: (w as any).date || (w.slot as any)?.date || 'N/A',
+                time: `${(w.slot as any)?.startTime || '--:--'} - ${(w.slot as any)?.endTime || '--:--'}`,
+                label: (w.slot as any)?.label || '',
+                capacity: `${(w.slot as any)?.currentBooked || 0}/${(w.slot as any)?.maxCapacity || 0}`,
+                temple: (w.slot as any)?.templeId || {},
+            },
+            joinedAt: w.joinedAt,
+            totalAmount: (w as any).bookingDetails?.totalAmount || 0,
+        }));
+
+        // Combine and sort by date (bookings first, then waitlists)
+        const combined = [...formattedBookings, ...formattedWaitlists];
+
         res.json({
             success: true,
-            count: formatted.length,
-            data: formatted,
+            count: combined.length,
+            data: combined,
         });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error' });
+    } catch (err: any) {
+        console.error('Error fetching my bookings:', err);
+        res.status(500).json({ message: 'Server error', error: err?.message || 'Unknown error' });
     }
 };
 

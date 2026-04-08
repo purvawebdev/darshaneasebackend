@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { Waitlist } from '../models/waitlist.model';
 import { Slot } from '../models/slot.model';
 import { Booking } from '../models/booking.model';
+import { protect } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -9,10 +10,14 @@ const router = Router();
  * POST /api/waitlist/join
  * User joins waitlist for a full slot
  */
-router.post('/join', async (req: Request, res: Response) => {
+router.post('/join', protect, async (req: Request, res: Response) => {
     try {
         const { slotId, templeId, date, bookingDetails } = req.body;
-        const userId = (req as any).userId; // From auth middleware
+        const userId = (req as any).user?.id; // From auth middleware
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
 
         // Validate input
         if (!slotId || !templeId || !date || !bookingDetails) {
@@ -96,10 +101,14 @@ router.post('/join', async (req: Request, res: Response) => {
  * GET /api/waitlist/my-position/:slotId
  * Get user's position in waitlist for a specific slot
  */
-router.get('/my-position/:slotId', async (req: Request, res: Response) => {
+router.get('/my-position/:slotId', protect, async (req: Request, res: Response) => {
     try {
         const { slotId } = req.params;
-        const userId = (req as any).userId;
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
 
         const waitlistEntry = await Waitlist.findOne({
             slot: slotId,
@@ -144,9 +153,13 @@ router.get('/my-position/:slotId', async (req: Request, res: Response) => {
  * GET /api/waitlist/my-waitlists
  * Get all waitlists user is part of
  */
-router.get('/my-waitlists', async (req: Request, res: Response) => {
+router.get('/my-waitlists', protect, async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).userId;
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
 
         const waitlists = await Waitlist.find({
             user: userId,
@@ -214,10 +227,14 @@ router.get('/slot/:slotId', async (req: Request, res: Response) => {
  * DELETE /api/waitlist/:waitlistId
  * Remove user from waitlist
  */
-router.delete('/:waitlistId', async (req: Request, res: Response) => {
+router.delete('/:waitlistId', protect, async (req: Request, res: Response) => {
     try {
         const { waitlistId } = req.params;
-        const userId = (req as any).userId;
+        const userId = (req as any).user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
 
         const waitlistEntry = await Waitlist.findById(waitlistId);
         if (!waitlistEntry) {

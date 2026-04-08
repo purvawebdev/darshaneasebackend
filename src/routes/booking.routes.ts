@@ -94,8 +94,13 @@ router.post('/:bookingId/cancel', protect, async (req: Request, res: Response) =
             $inc: { currentBooked: -1 }
         });
 
+        console.log(`\n🛑 Booking ${bookingId} cancelled by user ${userId}`);
+        console.log(`📞 Processing waitlist for slot ${booking.slot}...`);
+
         // Process waitlist - auto-confirm first person in queue
-        await processWaitlist(booking.slot.toString(), booking.temple?.toString(), slot.date);
+        const slotObj = booking.slot as any;
+        const slotIdForWaitlist = slotObj._id ? slotObj._id.toString() : slotObj.toString();
+        await processWaitlist(slotIdForWaitlist, booking.temple?.toString(), slot.date);
 
         res.json({
             success: true,
@@ -119,16 +124,20 @@ router.post('/:bookingId/cancel', protect, async (req: Request, res: Response) =
  */
 async function processWaitlist(slotId: string, templeId: string | undefined, date: string) {
     try {
-        // Get first person in waitlist
+        console.log(`\n🔄 Processing waitlist for slot ${slotId}...`);
+        
+        // Get first person in waitlist (sorted by position, then joinedAt for safety)
         const nextInLine = await Waitlist.findOne({
             slot: slotId,
             status: 'waiting'
-        }).sort({ joinedAt: 1 });
+        }).sort({ position: 1, joinedAt: 1 });
 
         if (!nextInLine) {
-            console.log('No one in waitlist');
+            console.log('❌ No one in waitlist to auto-confirm');
             return;
         }
+
+        console.log(`✅ Found next in line: ${nextInLine.user} at position ${nextInLine.position}`);
 
         // Create automatic booking for them
         const newBooking = new Booking({
@@ -140,6 +149,7 @@ async function processWaitlist(slotId: string, templeId: string | undefined, dat
         });
 
         const savedBooking = await newBooking.save();
+        console.log(`✅ Created booking ${savedBooking._id} for user ${nextInLine.user}`);
 
         // Update slot current booked
         await Slot.findByIdAndUpdate(slotId, {
@@ -150,20 +160,22 @@ async function processWaitlist(slotId: string, templeId: string | undefined, dat
         nextInLine.status = 'confirmed';
         nextInLine.confirmedBookingId = savedBooking._id;
         nextInLine.confirmedAt = new Date();
-        nextInLine.position = 1; // Mark as confirmed
+        nextInLine.position = 0; // Mark as confirmed
         await nextInLine.save();
+        console.log(`✅ Updated waitlist entry status to confirmed`);
 
         // Update other waitlist positions
-        await Waitlist.updateMany(
+        const updateResult = await Waitlist.updateMany(
             { slot: slotId, status: 'waiting' },
             { $inc: { position: -1 } }
         );
+        console.log(`✅ Updated ${updateResult.modifiedCount} other waitlist positions`);
 
-        console.log(`Auto-confirmed booking for user ${nextInLine.user}`);
+        console.log(`🎉 Auto-confirmed booking for user ${nextInLine.user}\n`);
 
         // TODO: Send notification/email to user about auto-confirmation
     } catch (error) {
-        console.error('Error processing waitlist:', error);
+        console.error('❌ Error processing waitlist:', error);
     }
 }
 

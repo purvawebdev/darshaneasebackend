@@ -25,7 +25,7 @@ export const simulatePayment = async (req: AuthRequest, res: Response) => {
             return res.status(401).json({ message: 'Not authenticated' });
         }
 
-        const { slotId } = req.body;
+        const { slotId, templeId, bookingDetails } = req.body;
 
         if (!slotId) {
             return res.status(400).json({ message: 'slotId is required' });
@@ -38,7 +38,7 @@ export const simulatePayment = async (req: AuthRequest, res: Response) => {
         const paymentId = `pay_sim_${crypto.randomBytes(8).toString('hex')}`;
 
         // Create the actual booking via the existing booking service
-        const booking = await bookingService.createBooking(userId, slotId);
+        const booking = await bookingService.createBooking(userId, slotId, templeId, bookingDetails);
 
         return res.status(201).json({
             success: true,

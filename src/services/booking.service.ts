@@ -2,7 +2,7 @@ import { Slot } from '../models/slot.model';
 import { Booking } from '../models/booking.model';
 
 export const bookingService = {
-    async createBooking(userId: string, slotId: string) {
+    async createBooking(userId: string, slotId: string, templeId?: string, bookingDetails?: any) {
         // 1. Find the slot
         const slot = await Slot.findById(slotId);
         if (!slot) {
@@ -23,6 +23,8 @@ export const bookingService = {
         const booking = await Booking.create({
             user: userId,
             slot: slotId,
+            temple: templeId,
+            bookingDetails: bookingDetails,
         });
 
         // 3. Increment currentBooked (atomic update)
